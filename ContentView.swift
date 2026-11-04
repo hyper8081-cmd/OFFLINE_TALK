@@ -71,6 +71,15 @@ struct ContentView: View {
                                     .font(.caption)
                             }
                         }
+                        if !radio.isHosting, let hostName = radio.connectedHostName {
+                            Text("接続端末: \(radio.connectedPeerNames.count + 1) / 5")
+                            Label("親機: \(hostName)", systemImage: "iphone")
+                                .font(.caption)
+                            ForEach(Array(radio.connectedPeerNames.enumerated()), id: \.offset) { item in
+                                Label(item.element, systemImage: "iphone")
+                                    .font(.caption)
+                            }
+                        }
                         if !radio.recentNotice.isEmpty {
                             Text(radio.recentNotice)
                                 .font(.caption)

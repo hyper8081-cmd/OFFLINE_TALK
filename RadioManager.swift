@@ -16,6 +16,11 @@ private struct PendingSend {
     let isAudio: Bool
 }
 
+private struct PeerRoster: Codable {
+    let hostName: String
+    let peers: [String]
+}
+
 @MainActor
 final class RadioManager: ObservableObject {
     @Published private(set) var status = "待機中"
@@ -25,6 +30,8 @@ final class RadioManager: ObservableObject {
     @Published private(set) var isConnecting = false
     @Published private(set) var connectedPeerCount = 0
     @Published private(set) var connectedPeers: [String] = []
+    @Published private(set) var connectedHostName: String?
+    @Published private(set) var connectedPeerNames: [String] = []
     @Published private(set) var foundHosts: [FoundHost] = []
     @Published private(set) var recentNotice = ""
     @Published private(set) var activeSpeakerName: String?
@@ -167,6 +174,8 @@ final class RadioManager: ObservableObject {
         reconnectTask = nil
         isAutomaticallySearching = false
         isConnecting = true
+        connectedHostName = nil
+        connectedPeerNames = []
         status = "\(host.displayName) に接続中…"
         browser?.cancel()
         browser = nil
@@ -185,6 +194,7 @@ final class RadioManager: ObservableObject {
                 case .ready:
                     guard self.clientConnection === connection else { return }
                     self.isConnecting = false
+                    self.connectedHostName = Self.safePeerName(host.displayName)
                     self.reconnectAttempt = 0
                     self.reconnectTask?.cancel()
                     self.reconnectTask = nil
@@ -202,6 +212,8 @@ final class RadioManager: ObservableObject {
                     self.connectionTimeoutTask?.cancel()
                     self.connectionTimeoutTask = nil
                     self.clientConnection = nil
+                    self.connectedHostName = nil
+                    self.connectedPeerNames = []
                     self.clientReceiveBuffer.removeAll(keepingCapacity: true)
                     self.receiveStarted.remove(ObjectIdentifier(connection))
                     self.pendingSends.removeValue(forKey: ObjectIdentifier(connection))
@@ -223,6 +235,8 @@ final class RadioManager: ObservableObject {
                     self.connectionTimeoutTask?.cancel()
                     self.connectionTimeoutTask = nil
                     self.clientConnection = nil
+                    self.connectedHostName = nil
+                    self.connectedPeerNames = []
                     self.clientReceiveBuffer.removeAll(keepingCapacity: true)
                     self.receiveStarted.remove(ObjectIdentifier(connection))
                     self.pendingSends.removeValue(forKey: ObjectIdentifier(connection))
@@ -362,6 +376,8 @@ final class RadioManager: ObservableObject {
         clientReceiveBuffer.removeAll()
         connectedPeerCount = 0
         connectedPeers = []
+        connectedHostName = nil
+        connectedPeerNames = []
         isActive = false
         isHosting = false
         isBrowsing = false
@@ -402,6 +418,7 @@ final class RadioManager: ObservableObject {
                     self.readyHostConnections.insert(key)
                     self.connectedPeerCount = self.readyHostConnections.count
                     self.refreshPeerList()
+                    self.broadcastPeerRoster()
                     self.status = "親機として待機中（チャンネル \(self.selectedChannel)）"
                     self.startAudioIfNeeded()
                     self.receiveNext(from: connection)
@@ -425,6 +442,7 @@ final class RadioManager: ObservableObject {
                     }
                     self.connectedPeerCount = self.readyHostConnections.count
                     self.refreshPeerList()
+                    self.broadcastPeerRoster()
                     if self.isHosting {
                         self.status = "親機として待機中（チャンネル \(self.selectedChannel)）"
                     }
@@ -539,6 +557,7 @@ final class RadioManager: ObservableObject {
             let announcedName = Self.safePeerName(String(decoding: payload.prefix(160), as: UTF8.self))
             peerNames[key] = announcedName.isEmpty ? "子機" : announcedName
             refreshPeerList()
+            broadcastPeerRoster()
             recentNotice = "\(peerNames[key] ?? "子機")が接続しました"
         case Wire.requestFloor:
             guard currentTalker == nil, !hostIsTalking else {
@@ -600,6 +619,15 @@ final class RadioManager: ObservableObject {
                 activeSpeakerName = nil
             }
             if !isPTTActive { status = "親機に接続しました（チャンネル \(selectedChannel)）" }
+        case Wire.peerRoster:
+            guard payload.count <= 2_048,
+                  let roster = try? JSONDecoder().decode(PeerRoster.self, from: payload),
+                  roster.peers.count <= 4 else { return }
+            let hostName = Self.safePeerName(roster.hostName)
+            connectedHostName = hostName.isEmpty ? "親機" : hostName
+            connectedPeerNames = roster.peers
+                .map(Self.safePeerName)
+                .filter { !$0.isEmpty }
         case Wire.audio:
             audio.play(pcm16Mono: payload)
         default:
@@ -744,6 +772,16 @@ final class RadioManager: ObservableObject {
             .sorted()
     }
 
+    private func broadcastPeerRoster() {
+        let hostName = Self.safePeerName(UIDevice.current.name)
+        let roster = PeerRoster(
+            hostName: hostName.isEmpty ? "親機" : hostName,
+            peers: connectedPeers
+        )
+        guard let payload = try? JSONEncoder().encode(roster), payload.count <= 2_048 else { return }
+        broadcast(type: Wire.peerRoster, payload: payload)
+    }
+
     private func isCurrentConnection(_ connection: NWConnection) -> Bool {
         if isHosting {
             return hostConnections[ObjectIdentifier(connection)] === connection
@@ -796,4 +834,5 @@ private enum Wire {
     static let talkEnded: UInt8 = 6
     static let audio: UInt8 = 7
     static let hello: UInt8 = 8
+    static let peerRoster: UInt8 = 9
 }

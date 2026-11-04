@@ -7,8 +7,8 @@ iPhone同士の近距離通信を検証するネイティブiOS試作です。�
 - 親機をチャンネル1〜10のいずれかで開始
 - 子機が同じチャンネルの親機をBonjourで検索
 - Network frameworkのピアツーピアWi-Fiを有効にして接続
-- 親機側で接続した子機の台数を表示（最大4台）
-- 接続した子機の端末名を表示
+- 親機側で接続した子機の台数と一覧を表示（最大4台）
+- 子機側で親機と他の子機の一覧を表示
 - 現在の発言者を表示
 - 子機の切断通知
 - バックグラウンド時の切断・再接続ローカル通知（許可された場合）
@@ -28,7 +28,7 @@ WindowsにはXcodeがないため、このワークスペース上ではiOSア�
 
 公開リポジトリの標準macOSランナーでiOS Simulator向けにコンパイルします。`main`へのpush時と手動起動時にワークフローが動きます。実行時間は15分で打ち切り、ビルド成果物は保存しません。公開ソースのコンパイル確認であり、iPhone実機への署名・インストールや端末間通信の確認は行いません。公開リポジトリの標準ランナーは無料です（[GitHubの課金説明](https://docs.github.com/en/billing/concepts/product-billing/github-actions)）。
 
-2026-11-04時点で、コミット `700bc75` のSimulator向けコンパイルが成功しています。最新の実行状況は[GitHub Actions](https://github.com/hyper8081-cmd/OFFLINE_TALK/actions/workflows/ios-build.yml)で確認できます。
+2026-11-04時点で、コミット `ea3ed9d` までのSimulator向けコンパイルが成功しています。最新の実行状況は[GitHub Actions](https://github.com/hyper8081-cmd/OFFLINE_TALK/actions/workflows/ios-build.yml)で確認できます。
 
 確認時は両方のiPhoneでWi-Fiをオンにし、アプリのローカルネットワークとマイクへのアクセスを許可します。ルーター、インターネット、携帯回線を切った状態で、片方を親機、もう片方を同じチャンネルの子機として接続し、PTTを押している間の送受話を確認します。iOS 16.7.11のiPhone Xを最初に確認します。
 
