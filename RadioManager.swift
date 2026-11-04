@@ -659,10 +659,10 @@ final class RadioManager: ObservableObject {
     }
 
     private func send(type: UInt8, payload: Data, through connection: NWConnection) {
-        guard let key = sessionKey else { connection.cancel(); return }
+        guard let encryptionKey = sessionKey else { connection.cancel(); return }
         var plaintext = Data([type])
         plaintext.append(payload)
-        guard let sealed = try? AES.GCM.seal(plaintext, using: key).combined else {
+        guard let sealed = try? AES.GCM.seal(plaintext, using: encryptionKey).combined else {
             connection.cancel()
             return
         }
