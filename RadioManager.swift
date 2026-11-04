@@ -584,7 +584,6 @@ final class RadioManager: ObservableObject {
             let wasContinuous = isContinuousTalkEnabled
             isWaitingForFloor = false
             isContinuousTalkEnabled = false
-            activeSpeakerName = nil
             if wasContinuous { pttPressed = false }
             status = "他の端末が送話中です"
         case Wire.talkStarted:
