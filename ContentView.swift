@@ -168,6 +168,9 @@ struct ContentView: View {
                         Text("初回はローカルネットワークとマイクの使用を許可してください。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        Label("アプリ上の暗号化と参加者認証は未実装です。機密情報は話さないでください。", systemImage: "lock.open")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
                     }
                     .font(.caption)
                     .frame(maxWidth: .infinity, alignment: .leading)
