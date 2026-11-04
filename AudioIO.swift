@@ -110,7 +110,7 @@ final class AudioIO: @unchecked Sendable {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playAndRecord,
                                 mode: .voiceChat,
-                                options: [.defaultToSpeaker, .allowBluetooth])
+                                options: [.defaultToSpeaker, .allowBluetoothHFP])
         try session.setPreferredSampleRate(preferredInputSampleRate)
         try session.setActive(true)
 
