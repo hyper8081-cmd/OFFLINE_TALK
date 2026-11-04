@@ -194,7 +194,7 @@ final class RadioManager: ObservableObject {
                     self.status = "親機に接続しました（チャンネル \(host.channel)）"
                     self.recentNotice = automatically ? "親機に再接続しました" : "親機に接続しました"
                     if automatically { notifyIfBackground(title: "再接続しました", body: "OFFLINE TALKの親機に再接続しました。") }
-                    self.send(type: Wire.hello, payload: Data(UIDevice.current.name.utf8), through: connection)
+                    self.send(type: Wire.hello, payload: Data(Self.safePeerName(UIDevice.current.name).utf8), through: connection)
                     self.startAudioIfNeeded()
                     self.receiveNext(from: connection)
                 case .failed(let error):
@@ -322,6 +322,21 @@ final class RadioManager: ObservableObject {
         guard canUsePTT, !pttPressed, !isWaitingForFloor else { return }
         isContinuousTalkEnabled = true
         beginPTT()
+    }
+
+    /// Release the floor whenever iOS removes the app from the foreground.
+    /// PTT and continuous talk are intentionally foreground-only in this prototype.
+    func appWillResignActive() {
+        guard isPTTActive || isWaitingForFloor || isContinuousTalkEnabled else { return }
+        isContinuousTalkEnabled = false
+        endPTT()
+    }
+
+    /// Retry audio initialization after returning from Settings to enable microphone access.
+    func appDidBecomeActive() {
+        guard isActive, !audioReady, !audioStarting,
+              isHosting || clientConnection != nil else { return }
+        startAudioIfNeeded()
     }
 
     func stop(clearStatus: Bool = true) {
@@ -521,8 +536,7 @@ final class RadioManager: ObservableObject {
         let key = ObjectIdentifier(connection)
         switch type {
         case Wire.hello:
-            let announcedName = String(decoding: payload.prefix(80), as: UTF8.self)
-                .filter { !$0.isNewline }
+            let announcedName = Self.safePeerName(String(decoding: payload.prefix(160), as: UTF8.self))
             peerNames[key] = announcedName.isEmpty ? "子機" : announcedName
             refreshPeerList()
             recentNotice = "\(peerNames[key] ?? "子機")が接続しました"
@@ -717,6 +731,12 @@ final class RadioManager: ObservableObject {
         let generated = String(UUID().uuidString.prefix(6)).lowercased()
         UserDefaults.standard.set(generated, forKey: key)
         return generated
+    }
+
+    private static func safePeerName(_ name: String) -> String {
+        let visible = name.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }
+        return String(String.UnicodeScalarView(visible).prefix(40))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func refreshPeerList() {

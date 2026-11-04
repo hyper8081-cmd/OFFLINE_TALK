@@ -14,6 +14,7 @@ struct OfflineTalkApp: App {
 
 struct ContentView: View {
     @EnvironmentObject private var radio: RadioManager
+    @Environment(\.scenePhase) private var scenePhase
     @State private var channel = 1
 
     var body: some View {
@@ -149,7 +150,7 @@ struct ContentView: View {
 
                 Spacer()
 
-                Text("音声は未実機検証の試作です。常時送話は一度に1台、画面を表示した状態でお使いください。")
+                Text("音声は未実機検証の試作です。送話は一度に1台です。アプリが前面から外れると送話を終了します。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -157,6 +158,13 @@ struct ContentView: View {
             .padding()
             }
             .navigationTitle("OFFLINE TALK")
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase != .active {
+                radio.appWillResignActive()
+            } else {
+                radio.appDidBecomeActive()
+            }
         }
     }
 }
