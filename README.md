@@ -33,7 +33,7 @@ WindowsにはXcodeがないため、このワークスペース上ではiOSア�
 
 このmacOSランナーは、ビルド中だけGitHubが用意するクラウド実行環境です。Xcodeを遠隔操作するデスクトップではなく、USBでiPhoneをつないで署名・実機インストールする用途には使えません。
 
-2026-11-04時点で、コミット `a6bc7cc` までのSimulator向けコンパイルが成功しています。最新の実行状況は[GitHub Actions](https://github.com/hyper8081-cmd/OFFLINE_TALK/actions/workflows/ios-build.yml)で確認できます。
+2026-11-04時点で、コミット `937d3c7` までのSimulator向けコンパイルが成功しています。最新の実行状況は[GitHub Actions](https://github.com/hyper8081-cmd/OFFLINE_TALK/actions/workflows/ios-build.yml)で確認できます。
 
 確認時は両方のiPhoneでWi-Fiをオンにし、アプリのローカルネットワークとマイクへのアクセスを許可します。ルーター、インターネット、携帯回線を切った状態で、片方を親機、もう片方を同じチャンネルの子機として接続し、PTTを押している間の送受話を確認します。iOS 16.7.11のiPhone Xを最初に確認します。
 
