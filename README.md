@@ -26,7 +26,9 @@ iPhone同士の近距離通信を検証するネイティブiOS試作です。�
 
 WindowsにはXcodeがないため、このワークスペース上ではiOSアプリをビルドできません。`OFFLINE_TALK.xcodeproj`をXcodeが使えるMacで開き、Signing & CapabilitiesでAppleの開発チームを設定して実機へインストールしてください。
 
-GitHubにこのプロジェクトを置く場合、`.github/workflows/ios-build.yml`のmacOSランナーでiOS Simulator向けのコンパイルを実行できます。これはコードのビルド確認用で、iPhone実機への署名・インストールや端末間通信の確認は行いません。ワークフローは手動起動のみで、実行時間は15分で打ち切ります。非公開リポジトリではGitHubの無料利用枠を使い、枠を超えるとアカウント設定によって請求が発生する可能性があります。費用を避けるには、GitHubのActions予算を0に設定するか、枠に達したら実行しないでください。公開リポジトリの標準macOSランナーは無料ですが、ソースコードが公開されます（[GitHubの課金説明](https://docs.github.com/en/billing/concepts/product-billing/github-actions)）。
+公開リポジトリの標準macOSランナーでiOS Simulator向けにコンパイルします。`main`へのpush時と手動起動時にワークフローが動きます。実行時間は15分で打ち切り、ビルド成果物は保存しません。公開ソースのコンパイル確認であり、iPhone実機への署名・インストールや端末間通信の確認は行いません。公開リポジトリの標準ランナーは無料です（[GitHubの課金説明](https://docs.github.com/en/billing/concepts/product-billing/github-actions)）。
+
+2026-11-04時点で、コミット `700bc75` のSimulator向けコンパイルが成功しています。最新の実行状況は[GitHub Actions](https://github.com/hyper8081-cmd/OFFLINE_TALK/actions/workflows/ios-build.yml)で確認できます。
 
 確認時は両方のiPhoneでWi-Fiをオンにし、アプリのローカルネットワークとマイクへのアクセスを許可します。ルーター、インターネット、携帯回線を切った状態で、片方を親機、もう片方を同じチャンネルの子機として接続し、PTTを押している間の送受話を確認します。iOS 16.7.11のiPhone Xを最初に確認します。
 
