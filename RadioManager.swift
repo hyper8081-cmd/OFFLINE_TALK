@@ -193,7 +193,7 @@ final class RadioManager: ObservableObject {
                     self.isAutomaticallySearching = false
                     self.status = "親機に接続しました（チャンネル \(host.channel)）"
                     self.recentNotice = automatically ? "親機に再接続しました" : "親機に接続しました"
-                    if automatically { notifyIfBackground(title: "再接続しました", body: "OFFLINE TALKの親機に再接続しました。") }
+                    if automatically { self.notifyIfBackground(title: "再接続しました", body: "OFFLINE TALKの親機に再接続しました。") }
                     self.send(type: Wire.hello, payload: Data(Self.safePeerName(UIDevice.current.name).utf8), through: connection)
                     self.startAudioIfNeeded()
                     self.receiveNext(from: connection)
@@ -714,7 +714,7 @@ final class RadioManager: ObservableObject {
         }
     }
 
-    private static func parseServiceName(_ name: String) -> (channel: Int, suffix: String)? {
+    nonisolated private static func parseServiceName(_ name: String) -> (channel: Int, suffix: String)? {
         let parts = name.split(separator: "-", maxSplits: 2)
         guard parts.count == 3,
               parts[0] == "OT",
