@@ -16,7 +16,7 @@ struct ContentView: View {
     @EnvironmentObject private var radio: RadioManager
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("offlineTalkDisplayName") private var displayName = ""
-    @AppStorage("offlineTalkJoinSecret") private var joinSecret = ""
+    @State private var joinSecret = ""
     @State private var channel = 1
 
     var body: some View {
@@ -65,7 +65,9 @@ struct ContentView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .disabled(radio.isActive)
                                 .onChange(of: joinSecret) { value in
-                                    joinSecret = String(value.lowercased().filter { $0.isHexDigit }.prefix(32))
+                                    let sanitized = String(value.lowercased().filter { $0.isHexDigit }.prefix(32))
+                                    if sanitized != value { joinSecret = sanitized }
+                                    radio.saveJoinSecret(sanitized)
                                 }
                             Text("親機と子機で同じコードを使います。接続データはこのコードから作る鍵で暗号化されます。")
                         }
@@ -235,6 +237,9 @@ struct ContentView: View {
             } else {
                 radio.appDidBecomeActive()
             }
+        }
+        .onAppear {
+            joinSecret = radio.savedJoinSecret
         }
     }
 }

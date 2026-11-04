@@ -4,6 +4,7 @@ import Network
 import SwiftUI
 import UIKit
 import UserNotifications
+import Security
 
 struct FoundHost: Identifiable {
     let id: String
@@ -41,6 +42,7 @@ final class RadioManager: ObservableObject {
     @Published private(set) var isContinuousTalkEnabled = false
     @Published private(set) var audioReady = false
     @Published private(set) var hostAccessCode = ""
+    @Published private(set) var savedJoinSecret = ""
 
     var canUsePTT: Bool {
         if isHosting { return connectedPeerCount > 0 && audioReady }
@@ -73,12 +75,14 @@ final class RadioManager: ObservableObject {
     private let serviceType = "_offlinetalk._tcp"
     private let audio = AudioIO()
     private var sessionKey: SymmetricKey? {
-        let raw = UserDefaults.standard.string(forKey: isHosting ? "offlineTalkHostSecret" : "offlineTalkJoinSecret") ?? ""
+        let raw = KeychainSecretStore.read(account: isHosting ? "host" : "join") ?? ""
         guard raw.count == 32, let data = Self.data(fromHex: raw) else { return nil }
         return SymmetricKey(data: data)
     }
 
     init() {
+        savedJoinSecret = KeychainSecretStore.migrateAndRead(account: "join", legacyDefaultsKey: "offlineTalkJoinSecret") ?? ""
+        _ = KeychainSecretStore.migrateAndRead(account: "host", legacyDefaultsKey: "offlineTalkHostSecret")
         audio.onCapturedPCM = { [weak self] pcm in
             Task { @MainActor in
                 self?.sendAudio(pcm)
@@ -86,10 +90,23 @@ final class RadioManager: ObservableObject {
         }
     }
 
+    func saveJoinSecret(_ value: String) {
+        guard value.count == 32 || value.isEmpty else { return }
+        guard KeychainSecretStore.write(value, account: "join") else {
+            status = "参加コードを安全に保存できませんでした"
+            return
+        }
+        savedJoinSecret = value
+    }
+
     func startHost(channel: Int) {
         stop()
         selectedChannel = channel
         hostAccessCode = Self.persistentHostSecret()
+        guard hostAccessCode.count == 32 else {
+            status = "参加コードをKeychainに保存できないため親機を開始できません"
+            return
+        }
         do {
             let parameters = NWParameters.tcp
             parameters.includePeerToPeer = true
@@ -799,12 +816,11 @@ final class RadioManager: ObservableObject {
     }
 
     private static func persistentHostSecret() -> String {
-        let key = "offlineTalkHostSecret"
-        if let saved = UserDefaults.standard.string(forKey: key), saved.count == 32 { return saved }
+        if let saved = KeychainSecretStore.migrateAndRead(account: "host", legacyDefaultsKey: "offlineTalkHostSecret"), saved.count == 32 { return saved }
         let generated = SymmetricKey(size: .bits128).withUnsafeBytes { bytes in
             bytes.map { String(format: "%02x", $0) }.joined()
         }
-        UserDefaults.standard.set(generated, forKey: key)
+        guard KeychainSecretStore.write(generated, account: "host") else { return "" }
         return generated
     }
 
@@ -890,6 +906,52 @@ final class RadioManager: ObservableObject {
                                             content: content,
                                             trigger: nil)
         UNUserNotificationCenter.current().add(request)
+    }
+}
+
+private enum KeychainSecretStore {
+    private static let service = "jp.offlinetalk.app.encryption"
+
+    static func read(account: String) -> String? {
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        query[kSecAttrSynchronizable as String] = false
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func migrateAndRead(account: String, legacyDefaultsKey: String) -> String? {
+        if let existing = read(account: account) { return existing }
+        guard let legacy = UserDefaults.standard.string(forKey: legacyDefaultsKey) else { return nil }
+        guard write(legacy, account: account) else { return nil }
+        UserDefaults.standard.removeObject(forKey: legacyDefaultsKey)
+        return legacy
+    }
+
+    static func write(_ value: String, account: String) -> Bool {
+        let data = Data(value.utf8)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecSuccess { return true }
+        guard updateStatus == errSecItemNotFound else { return false }
+        var insert = query
+        attributes.forEach { insert[$0.key] = $0.value }
+        return SecItemAdd(insert as CFDictionary, nil) == errSecSuccess
     }
 }
 
