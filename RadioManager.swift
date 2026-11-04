@@ -296,10 +296,10 @@ final class RadioManager: ObservableObject {
             }
             hostIsTalking = true
             isPTTActive = true
-            activeSpeakerName = "親機"
+            activeSpeakerName = Self.localDisplayName()
             audio.setTransmitting(true)
-            status = "送話中（親機）"
-            broadcast(type: Wire.talkStarted, payload: Data("親機".utf8))
+            status = "送話中（\(activeSpeakerName ?? "親機")）"
+            broadcast(type: Wire.talkStarted, payload: Data((activeSpeakerName ?? "親機").utf8))
         } else if let clientConnection {
             isWaitingForFloor = true
             status = "発言権を確認中…"
