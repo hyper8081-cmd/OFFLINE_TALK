@@ -57,6 +57,7 @@ final class RadioManager: ObservableObject {
     private var hostReceiveBuffers: [ObjectIdentifier: Data] = [:]
     private var peerNames: [ObjectIdentifier: String] = [:]
     private var receiveStarted = Set<ObjectIdentifier>()
+    private var authenticationTimeouts: [ObjectIdentifier: Task<Void, Never>] = [:]
     private var clientReceiveBuffer = Data()
     private var selectedChannel = 1
     private var currentTalker: ObjectIdentifier?
@@ -381,6 +382,8 @@ final class RadioManager: ObservableObject {
         hostReceiveBuffers.removeAll()
         peerNames.removeAll()
         receiveStarted.removeAll()
+        for timeout in authenticationTimeouts.values { timeout.cancel() }
+        authenticationTimeouts.removeAll()
         clientReceiveBuffer.removeAll()
         connectedPeerCount = 0
         connectedPeers = []
@@ -417,6 +420,17 @@ final class RadioManager: ObservableObject {
         let key = ObjectIdentifier(connection)
         hostConnections[key] = connection
         hostReceiveBuffers[key] = Data()
+        authenticationTimeouts[key] = Task { @MainActor [weak self, weak connection] in
+            do {
+                try await Task.sleep(nanoseconds: 8_000_000_000)
+            } catch {
+                return
+            }
+            guard let self, let connection,
+                  self.hostConnections[key] === connection,
+                  self.peerNames[key] == nil else { return }
+            connection.cancel()
+        }
         connection.stateUpdateHandler = { [weak self, weak connection] state in
             Task { @MainActor in
                 guard let self, let connection,
@@ -432,6 +446,7 @@ final class RadioManager: ObservableObject {
                     self.receiveNext(from: connection)
                 case .failed, .cancelled:
                     self.hostConnections.removeValue(forKey: key)
+                    self.authenticationTimeouts.removeValue(forKey: key)?.cancel()
                     let wasReady = self.readyHostConnections.remove(key) != nil
                     self.pendingSends.removeValue(forKey: key)
                     self.sendingConnections.remove(key)
@@ -549,6 +564,9 @@ final class RadioManager: ObservableObject {
               let type = plaintext.first else {
             connection.cancel()
             return
+        }
+        if isHosting {
+            authenticationTimeouts.removeValue(forKey: ObjectIdentifier(connection))?.cancel()
         }
         let payload = plaintext.dropFirst()
         if type == Wire.audio,
