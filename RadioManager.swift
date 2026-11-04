@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import Network
 import SwiftUI
 import UIKit
@@ -39,6 +40,7 @@ final class RadioManager: ObservableObject {
     @Published private(set) var isWaitingForFloor = false
     @Published private(set) var isContinuousTalkEnabled = false
     @Published private(set) var audioReady = false
+    @Published private(set) var hostAccessCode = ""
 
     var canUsePTT: Bool {
         if isHosting { return connectedPeerCount > 0 && audioReady }
@@ -69,6 +71,11 @@ final class RadioManager: ObservableObject {
     private var isAutomaticallySearching = false
     private let serviceType = "_offlinetalk._tcp"
     private let audio = AudioIO()
+    private var sessionKey: SymmetricKey? {
+        let raw = UserDefaults.standard.string(forKey: isHosting ? "offlineTalkHostSecret" : "offlineTalkJoinSecret") ?? ""
+        guard raw.count == 32, let data = Self.data(fromHex: raw) else { return nil }
+        return SymmetricKey(data: data)
+    }
 
     init() {
         audio.onCapturedPCM = { [weak self] pcm in
@@ -81,6 +88,7 @@ final class RadioManager: ObservableObject {
     func startHost(channel: Int) {
         stop()
         selectedChannel = channel
+        hostAccessCode = Self.persistentHostSecret()
         do {
             let parameters = NWParameters.tcp
             parameters.includePeerToPeer = true
@@ -535,8 +543,14 @@ final class RadioManager: ObservableObject {
     }
 
     private func handle(_ message: Data, from connection: NWConnection) {
-        guard let type = message.first else { return }
-        let payload = message.dropFirst()
+        guard let key = sessionKey,
+              let sealed = try? AES.GCM.SealedBox(combined: message),
+              let plaintext = try? AES.GCM.open(sealed, using: key),
+              let type = plaintext.first else {
+            connection.cancel()
+            return
+        }
+        let payload = plaintext.dropFirst()
         if type == Wire.audio,
            (payload.isEmpty || payload.count % MemoryLayout<Int16>.size != 0
             || payload.count > Wire.maximumAudioPayloadBytes) {
@@ -645,8 +659,14 @@ final class RadioManager: ObservableObject {
     }
 
     private func send(type: UInt8, payload: Data, through connection: NWConnection) {
-        var body = Data([type])
-        body.append(payload)
+        guard let key = sessionKey else { connection.cancel(); return }
+        var plaintext = Data([type])
+        plaintext.append(payload)
+        guard let sealed = try? AES.GCM.seal(plaintext, using: key).combined else {
+            connection.cancel()
+            return
+        }
+        var body = sealed
         var length = UInt32(body.count).bigEndian
         var packet = withUnsafeBytes(of: &length) { Data($0) }
         packet.append(body)
@@ -753,11 +773,34 @@ final class RadioManager: ObservableObject {
     }
 
     private static func persistentHostCode() -> String {
-        let key = "offlineTalkHostCode"
+        let key = "offlineTalkHostID"
         if let saved = UserDefaults.standard.string(forKey: key) { return saved }
         let generated = String(UUID().uuidString.prefix(6)).lowercased()
         UserDefaults.standard.set(generated, forKey: key)
         return generated
+    }
+
+    private static func persistentHostSecret() -> String {
+        let key = "offlineTalkHostSecret"
+        if let saved = UserDefaults.standard.string(forKey: key), saved.count == 32 { return saved }
+        let generated = SymmetricKey(size: .bits128).withUnsafeBytes { bytes in
+            bytes.map { String(format: "%02x", $0) }.joined()
+        }
+        UserDefaults.standard.set(generated, forKey: key)
+        return generated
+    }
+
+    private static func data(fromHex value: String) -> Data? {
+        guard value.count == 32 else { return nil }
+        var data = Data(capacity: 16)
+        var index = value.startIndex
+        for _ in 0..<16 {
+            let next = value.index(index, offsetBy: 2)
+            guard let byte = UInt8(value[index..<next], radix: 16) else { return nil }
+            data.append(byte)
+            index = next
+        }
+        return data
     }
 
     private static func safePeerName(_ name: String) -> String {

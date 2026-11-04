@@ -16,6 +16,7 @@ struct ContentView: View {
     @EnvironmentObject private var radio: RadioManager
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("offlineTalkDisplayName") private var displayName = ""
+    @AppStorage("offlineTalkJoinSecret") private var joinSecret = ""
     @State private var channel = 1
 
     var body: some View {
@@ -50,6 +51,29 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                GroupBox("参加コード") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if radio.isHosting {
+                            Text(radio.hostAccessCode)
+                                .font(.system(.body, design: .monospaced).weight(.bold))
+                                .textSelection(.enabled)
+                            Text("子機にこの32文字を伝えて入力してもらいます。")
+                        } else {
+                            TextField("親機に表示された32文字のコード", text: $joinSecret)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .textFieldStyle(.roundedBorder)
+                                .disabled(radio.isActive)
+                                .onChange(of: joinSecret) { value in
+                                    joinSecret = String(value.lowercased().filter { $0.isHexDigit }.prefix(32))
+                                }
+                            Text("親機と子機で同じコードを使います。接続データはこのコードから作る鍵で暗号化されます。")
+                        }
+                    }
+                    .font(.caption)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 HStack(spacing: 16) {
                     Button("親機を開始") {
                         radio.startHost(channel: channel)
@@ -61,7 +85,7 @@ struct ContentView: View {
                         radio.startBrowsing(channel: channel)
                     }
                     .buttonStyle(.bordered)
-                    .disabled(radio.isActive)
+                    .disabled(radio.isActive || joinSecret.count != 32)
                 }
 
                 if radio.isActive {
@@ -186,7 +210,7 @@ struct ContentView: View {
                         Text("初回はローカルネットワークとマイクの使用を許可してください。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Label("アプリ上の暗号化と参加者認証は未実装です。機密情報は話さないでください。", systemImage: "lock.open")
+                        Label("接続コードによる暗号化を実装しています。第三者にコードを共有しないでください。", systemImage: "lock")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
