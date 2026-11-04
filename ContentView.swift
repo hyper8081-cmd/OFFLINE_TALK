@@ -15,12 +15,30 @@ struct OfflineTalkApp: App {
 struct ContentView: View {
     @EnvironmentObject private var radio: RadioManager
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("offlineTalkDisplayName") private var displayName = ""
     @State private var channel = 1
 
     var body: some View {
         NavigationStack {
             ScrollView {
             VStack(spacing: 20) {
+                GroupBox("端末名") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        TextField("例：親機、Aチーム", text: $displayName)
+                            .textFieldStyle(.roundedBorder)
+                            .disabled(radio.isActive)
+                            .onChange(of: displayName) { value in
+                                if value.count > 40 {
+                                    displayName = String(value.prefix(40))
+                                }
+                            }
+                        Text("接続一覧や発言者表示に使います。空欄ならiPhoneの端末名を使います。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 Picker("チャンネル", selection: $channel) {
                     ForEach(1...10, id: \.self) { number in
                         Text("チャンネル \(number)").tag(number)

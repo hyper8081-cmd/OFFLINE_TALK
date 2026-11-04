@@ -204,7 +204,7 @@ final class RadioManager: ObservableObject {
                     self.status = "親機に接続しました（チャンネル \(host.channel)）"
                     self.recentNotice = automatically ? "親機に再接続しました" : "親機に接続しました"
                     if automatically { self.notifyIfBackground(title: "再接続しました", body: "OFFLINE TALKの親機に再接続しました。") }
-                    self.send(type: Wire.hello, payload: Data(Self.safePeerName(UIDevice.current.name).utf8), through: connection)
+                    self.send(type: Wire.hello, payload: Data(Self.localDisplayName().utf8), through: connection)
                     self.startAudioIfNeeded()
                     self.receiveNext(from: connection)
                 case .failed(let error):
@@ -595,7 +595,7 @@ final class RadioManager: ObservableObject {
             }
             isWaitingForFloor = false
             isPTTActive = true
-            activeSpeakerName = UIDevice.current.name
+            activeSpeakerName = Self.localDisplayName()
             audio.setTransmitting(true)
             status = "送話中"
         case Wire.floorDenied:
@@ -766,6 +766,14 @@ final class RadioManager: ObservableObject {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private static func localDisplayName() -> String {
+        let configuredName = UserDefaults.standard.string(forKey: "offlineTalkDisplayName") ?? ""
+        let safeConfiguredName = safePeerName(configuredName)
+        if !safeConfiguredName.isEmpty { return safeConfiguredName }
+        let deviceName = safePeerName(UIDevice.current.name)
+        return deviceName.isEmpty ? "iPhone" : deviceName
+    }
+
     private func refreshPeerList() {
         connectedPeers = readyHostConnections
             .map { peerNames[$0] ?? "接続中…" }
@@ -773,7 +781,7 @@ final class RadioManager: ObservableObject {
     }
 
     private func broadcastPeerRoster() {
-        let hostName = Self.safePeerName(UIDevice.current.name)
+        let hostName = Self.localDisplayName()
         let roster = PeerRoster(
             hostName: hostName.isEmpty ? "親機" : hostName,
             peers: connectedPeers
