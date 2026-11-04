@@ -28,6 +28,9 @@ struct ContentView: View {
                 }
                 .pickerStyle(.menu)
                 .disabled(radio.isActive)
+                Text("チャンネル番号はアプリ内のグループ分けです。無線周波数は変わりません。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 HStack(spacing: 16) {
                     Button("親機を開始") {
@@ -146,6 +149,19 @@ struct ContentView: View {
                             }
                         }
                     }
+                }
+
+                GroupBox("使い方") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("全端末でWi-Fiをオンにします。ルーターやインターネットは不要です。", systemImage: "wifi")
+                        Label("1台で親機を開始し、他の端末は同じチャンネルの親機を選びます。", systemImage: "iphone")
+                        Label("PTTを押している間だけ話せます。送話は一度に1台です。", systemImage: "mic")
+                        Text("初回はローカルネットワークとマイクの使用を許可してください。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Spacer()
