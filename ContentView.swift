@@ -97,7 +97,7 @@ struct ContentView: View {
                         )
                         .accessibilityLabel(radio.isPTTActive ? "送話中" : "PTT送話")
                         .accessibilityHint("通常は押している間だけ送話します。VoiceOverでは実行のたびに送話を開始または終了します。")
-                        .accessibilityAction(.activate) {
+                        .accessibilityAction {
                             if radio.isPTTActive || radio.isWaitingForFloor {
                                 radio.endPTT()
                             } else {
